@@ -1,0 +1,52 @@
+<OGRVRTDataSource> 
+  <OGRVRTLayer name="ril"> 
+    <SrcDataSource>ril.csv</SrcDataSource> 
+    <GeometryType>wkbPoint</GeometryType> 
+    <LayerSRS>EPSG:2154</LayerSRS> 
+    <GeometryField encoding="PointFromColumns" x="x" y="y"/>
+    <FeatureCount>18159</FeatureCount> 
+    <Field name="DEPCOM"                 type="Integer" width="5"/>
+    <Field name="ID_EA"                  type="String"  width="15"/>
+    <Field name="PRINCIPAL"              type="String"  width="3"/>
+    <Field name="RIVOLI"                 type="String"  width="5"/>
+    <Field name="NUMERO"                 type="Integer" width="4"/>
+    <Field name="REPETITION"             type="String"  width="4"/>
+    <Field name="ACTUALITE"              type="Integer" width="2"/>
+    <Field name="COMPLEMENT"             type="String"  width="50"/>
+    <Field name="TYPE_VOIE"              type="String"  width="50"/>
+    <Field name="LIBELLE"                type="String"  width="50"/>
+    <Field name="CATEGORIE"              type="String"  width="50"/>
+    <Field name="TYPE"                   type="String"  width="50"/>
+    <Field name="NOMBRE_LOGEMENTS"       type="Integer" width="4"/>
+    <Field name="NUMERO_PERMIS"          type="String"  width="50"/>
+    <Field name="COMMENTAIRE"            type="String"  width="50"/>
+    <Field name="ANNEE_CONSTRUCTION"     type="Integer" width="4"/>
+    <Field name="NOMBRE_IMMEUBLES"       type="Integer" width="4"/>
+    <Field name="NOMBRE_NIVEAUX"         type="Integer" width="4"/>
+    <Field name="SOUS_TYPE"              type="String"  width="50"/>
+    <Field name="ENSEIGNE"               type="String"  width="50"/>
+    <Field name="LIEN_CMT"               type="String"  width="50"/>
+    <Field name="TYPE_LOCALISATION"      type="String"  width="50"/>
+    <Field name="NUMERO_PARCELLE"        type="String"  width="50"/>
+    <Field name="IRIS"                   type="String"  width="50"/>
+    <Field name="ILOT"                   type="String"  width="50"/>
+    <Field name="QP"                     type="String"  width="50"/>
+    <Field name="CANTON"                 type="String"  width="50"/>
+    <Field name="LISTE_INSEE"            type="String"  width="50"/>
+    <Field name="ID_RP"                  type="String"  width="50"/>
+    <Field name="DERNIER_TIRAGE"         type="Integer" width="4"/>
+    <Field name="ECHANTILLON"            type="String"  width="50"/>
+    <Field name="GRP_ROTATION"           type="String"  width="50"/>
+    <Field name="DATEMAJ_EA"             type="String"  width="8"/>
+    <Field name="COM_ANC_IDFT"           type="String"  width="50"/>
+    <Field name="COM_SOUS_CATEGORIE"     type="String"  width="50"/>
+    <Field name="COM_STATUT"             type="String"  width="50"/>
+    <Field name="COM_NB_LOG"             type="String"  width="50"/>
+    <Field name="COM_NOM"                type="String"  width="50"/>
+    <Field name="COM_DATE_CREATION"      type="String"  width="50"/>
+    <Field name="COM_DATE_FERMETURE"     type="String"  width="50"/>
+    <Field name="COM_CAPACITE"           type="String"  width="50"/>
+    <Field name="ENVOI_MODIF_IMPORTANTE" type="String"  width="50"/>
+    <Field name="ENVOI_COMMENTAIRE"      type="String"  width="50"/>
+  </OGRVRTLayer> 
+</OGRVRTDataSource>
