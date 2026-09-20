@@ -1,276 +1,43 @@
-/*
-http://localhost/intra_wm/demos/Carte/Simple.php
-http://vm-geoserver-d/intra_wm/demos/Carte/Simple.php
-*/
-$(document).ready(function() {
+document.addEventListener("DOMContentLoaded", function () {
+	var menuButtons = document.querySelectorAll(".menu-toggle");
 
-    $(document).on("click", ".menu-toggle", function(event) {
-       event.stopPropagation();
-       var menu = $(this).siblings(".popup-menu");
-       $(".popup-menu").not(menu).removeClass("is-open");
-       $(".menu-toggle").not(this).attr("aria-expanded", "false");
-       menu.toggleClass("is-open");
-       $(this).attr("aria-expanded", menu.hasClass("is-open"));
-      });
+	function closeMenus() {
+		document.querySelectorAll(".popup-menu.is-open").forEach(function (menu) {
+			menu.classList.remove("is-open");
+			menu.previousElementSibling.setAttribute("aria-expanded", "false");
+		});
+	}
 
-    $(document).on("click", function() {
-       $(".popup-menu").removeClass("is-open");
-       $(".menu-toggle").attr("aria-expanded", "false");
-      });
+	menuButtons.forEach(function (button) {
+		button.addEventListener("click", function (event) {
+			event.stopPropagation();
 
-    $(document).on("keydown", function(event) {
-       if (event.key === "Escape") {
-          $(".popup-menu").removeClass("is-open");
-          $(".menu-toggle").attr("aria-expanded", "false");
-         }
-      });
-    
-    // Couche
-    appli.carte.CoucheCharger({"id":"DPVUF", "nom":"DPVUF", visibility:true});    
-    
-           /*
-    return;
+			var menu = button.nextElementSibling;
+			var isOpen = menu.classList.contains("is-open");
 
-    
-    // Ajout des fond de plan
-    appli.carte.FdpCharger({"id":"CAD", "nom":"Cadastre"}); 
-    appli.carte.FdpCharger({"id":"PLV", "nom":"Plan de ville", visibility:true});
+			closeMenus();
+			if (!isOpen) {
+				menu.classList.add("is-open");
+				button.setAttribute("aria-expanded", "true");
+			}
+		});
+	});
 
-    // Centrer
-    appli.carte.Centrer({zoom:8});
-    
-    appli.carte.Mesurer("surface");
-    
+	document.querySelectorAll("[role=menuitem]").forEach(function (item) {
+		item.addEventListener("click", function () {
+			var action = item.dataset.action;
+			var elementName = item.closest(".list-item").querySelector("span").textContent;
 
-    $("#btnMesureLongueur").click(function() {
-       appli.carte.Mesurer("longueur");
-      });
-      
-    $("#btnMesureSurface").click(function() { 
-       appli.carte.Mesurer("surface");
-      }); 
-      
-    $("#btnMesureTerminer").click(function() { 
-       appli.carte.Mesurer();
-      }); 
-      
-    return;
-    // S�lection
-    appli.carte.SelectionActiver({
-       table : "DPVUF"
-      });
-     
-    $("#btnSelectionFin").click(function() {
-       click2.setActive(false)
-      });
-      
-    $("#btnSelectionActiver").click(function() { 
-       click2.setActive(true)
-      }); 
-      */
-   });
- 
-/**
- *
+			alert(action + " : " + elementName);
+			closeMenus();
+		});
+	});
 
-VseCarte.prototype.Mesurer= function (mesure) {
-    // Variables
-    var carte = this, helpTooltipElement, measureTooltipElement, measureTooltip, vector;
+	document.addEventListener("click", closeMenus);
 
-    // On supprime le controle s'il existe
-    if (carte.control.mesure) {
-       // On supprime l'interaction de dessin
-       carte.map.removeInteraction(carte.control.mesure); 
-       // On supprime l'interaction d'aide � la saisie
-       carte.map.un('pointermove',carte.control.pointerMoveHandler);
-       // On supprime les constructions
-       carte.control.mesureSource.clear();
-       // On supprime tous les overlays
-       carte.map.getOverlays().clear();
-      }
-   
-    // Pas de mesure sp�cifi�e
-    if (!mesure) { return false; }
-    // Prise en compte de la mesure demand�e
-    type = (mesure === "surface") ? "Polygon" : "LineString";
-
-    // Creates a new measure tooltip
-    function createMeasureTooltip() {
-       if (measureTooltipElement) { measureTooltipElement.parentNode.removeChild(measureTooltipElement); }
-       measureTooltipElement = document.createElement('div');
-       measureTooltipElement.className = 'tooltip tooltip-measure';
-       measureTooltip = new ol.Overlay({
-          element     : measureTooltipElement,
-          offset      : [0, -15],
-          positioning : 'bottom-center'
-         });
-       carte.map.addOverlay(measureTooltip);
-      }
-    
-    // Aide � la saisie de la construction
-    function createHelpTooltip () {
-       if (helpTooltipElement) { helpTooltipElement.parentNode.removeChild(helpTooltipElement); }
-       helpTooltipElement = document.createElement('div');
-       helpTooltipElement.className = 'tooltip hidden';
-       carte.control.helpTooltip = new ol.Overlay({
-          element     : helpTooltipElement,
-          offset      : [15, 0],
-          positioning : 'center-left'
-        });
-       carte.map.addOverlay(carte.control.helpTooltip);
-      };
-      
-    // 
-    createMeasureTooltip();
-    // 
-    createHelpTooltip();
-
-    // 
-    if (!carte.control.mesureSource ) {
-       // Source vecteur
-       carte.control.mesureSource = new ol.source.Vector();
-       // Style des constructions des mesures termin�es
-       vector = new ol.layer.Vector({
-          source : carte.control.mesureSource,
-          style  : new ol.style.Style({
-             fill : new ol.style.Fill({
-                color : 'rgba(255, 255, 255, 0.2)'
-               }),
-             stroke : new ol.style.Stroke({
-                color : '#ffcc33',
-                width : 5
-               }),
-             image : new ol.style.Circle({
-                radius : 7,
-                fill   : new ol.style.Fill({
-                   color: '#ffcc33'
-                  })
-               })
-            })
-         });
-       // Ajout de la couche sur la carte
-       carte.map.addLayer(vector);
-      }
-    
-    // Test du controle d'aide � la saisie
-    if (!carte.control.pointerMoveHandler) {
-       // Cr�ation de l'interaction
-       carte.control.pointerMoveHandler = function(evt) {
-          // On ne traite pas le deplacement de la carte
-          if (evt.dragging) { return; }
-          // Message par d"faut
-          var geom, helpMsg = 'Clic gauche pour commencer';
-          // Construction en cours
-          if (carte.control.sketch) {
-             // G�om�trie de la construction
-             geom = carte.control.sketch.getGeometry();
-             // Saisie d'une ligne
-             helpMsg =  'Clic gauche pour continuer la ligne<br/>Double clic pour terminer';
-             // Saisie d'une surface
-             if (geom instanceof ol.geom.Polygon) { helpMsg =  'Clic gauche pour continuer la ligne'; }
-            }
-          // Contenu du message
-          helpTooltipElement.innerHTML = helpMsg;
-          // Position du message
-          carte.control.helpTooltip.setPosition(evt.coordinate);
-          // Visibilit� du message
-          $(helpTooltipElement).removeClass('hidden');
-         };
-      }  
-      
-    // Assocition avec la carte
-    carte.map.on('pointermove',carte.control.pointerMoveHandler);
-    // Sortie de la vue 
-    $(carte.map.getViewport()).on('mouseout', function() {
-       // On masque l'aide � la saisie
-       $(helpTooltipElement).addClass('hidden');
-      });
-
-    // Cr�ation du controle
-    carte.control.mesure = new ol.interaction.Draw({
-       source : carte.control.mesureSource,
-       type   : type,
-       style  : new ol.style.Style({
-          fill : new ol.style.Fill({
-             color : 'rgba(255, 255, 255, 0.2)'
-            }),
-          stroke: new ol.style.Stroke({
-             color    : 'rgba(0, 0, 0, 0.5)',
-             lineDash : [10, 10],
-             width    : 2
-            }),
-          image : new ol.style.Circle({
-             radius : 6,
-             stroke : new ol.style.Stroke({
-                width : 2,
-                color : 'rgba(0, 0, 0, 0.7)'
-               }),
-             fill : new ol.style.Fill({
-                color : 'rgba(255, 255, 255, 0.5)'
-               })
-            })
-         })
-      });
-    //
-    carte.map.addInteraction(carte.control.mesure);
-
-    // D�but de lesure
-    carte.control.mesure.on('drawstart',
-       function (evt) {
-          // M�m�o de la construction en cours 
-          carte.control.sketch = evt.feature;
-          //
-          var tooltipCoord = evt.coordinate;
-          // 
-          listener = carte.control.sketch.getGeometry().on('change', function(evt) {
-             //
-             var surface, longueur, output, geom = evt.target;
-             // Surface
-             if (geom instanceof ol.geom.Polygon) {
-                // 
-                surface = geom.getArea();
-                //
-                if (surface > 10000) {
-                   output = (Math.round(surface / 1000000 * 100) / 100) + ' ' + 'km<sup>2</sup>';
-                  }
-                else {
-                   output = (Math.round(surface * 100) / 100) + ' ' + 'm<sup>2</sup>';
-                  }
-                tooltipCoord = geom.getInteriorPoint().getCoordinates();
-               }
-             else if (geom instanceof ol.geom.LineString) {
-                //
-                longueur = Math.round(geom.getLength() * 100) / 100;
-                //
-                if (longueur > 100) {
-                   output = (Math.round(longueur / 1000 * 100) / 100) + ' ' + 'km';
-                  } 
-                else {
-                   output = (Math.round(longueur * 100) / 100) + ' ' + 'm';
-                  }
-                tooltipCoord = geom.getLastCoordinate();
-               }
-             measureTooltipElement.innerHTML = output;
-             measureTooltip.setPosition(tooltipCoord);
-           });
-         },
-       this
-      );
-
-    // Fin de mesure
-    carte.control.mesure.on('drawend',
-       function() {
-          measureTooltipElement.className = 'tooltip tooltip-static';
-          measureTooltip.setOffset([0, -7]);
-          // unset sketch
-          carte.control.sketch = null;
-          // unset tooltip so that a new one can be created
-          measureTooltipElement = null;
-          //
-          createMeasureTooltip();
-          ol.Observable.unByKey(listener);
-         },
-       this
-      );
-   };
-    */
+	document.addEventListener("keydown", function (event) {
+		if (event.key === "Escape") {
+			closeMenus();
+		}
+	});
+});
