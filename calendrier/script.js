@@ -35,19 +35,36 @@ form.addEventListener("submit",saveEvent);
 dialog.addEventListener("click",event=>{if(event.target===dialog)closeDialog();});
 render();
 
+/** Retourne une nouvelle date positionnée au début du jour indiqué. */
 function startOfDay(date){return new Date(date.getFullYear(),date.getMonth(),date.getDate());}
+/** Décale une date d'un nombre donné de jours, sans modifier la date d'origine. */
 function addDays(date,amount){const result=new Date(date);result.setDate(result.getDate()+amount);return result;}
+/** Décale une date d'un nombre de mois et la positionne au premier du mois obtenu. */
 function addMonths(date,amount){return new Date(date.getFullYear(),date.getMonth()+amount,1);}
+/** Indique si deux dates correspondent au même jour du calendrier. */
 function sameDay(a,b){return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();}
+/** Détermine si un événement commence et finit à minuit, donc couvre une journée entière. */
 function isAllDay(event){return event.start.getHours()===0&&event.start.getMinutes()===0&&event.end.getHours()===0&&event.end.getMinutes()===0;}
-function formatDateTime(date){const pad=n=>String(n).padStart(2,"0");return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;}
+/** Formate une date pour les champs de formulaire de type date et heure locale. */
+function formatDateTime(date){
+  // Complète chaque composante numérique avec un zéro si nécessaire.
+  const pad=n=>String(n).padStart(2,"0");
+  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+/** Convertit la valeur locale d'un champ date-heure en objet Date. */
 function fromDateTime(value){const [d,t]=value.split("T"),[y,m,day]=d.split("-").map(Number),[h,min]=t.split(":").map(Number);return new Date(y,m-1,day,h,min);}
+/** Formate une heure selon les conventions françaises, sans afficher les secondes. */
 function formatTime(date){return date.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});}
+/** Produit les variables CSS correspondant à la couleur d'un événement. */
 function eventStyle(event){const color=COLORS[event.color]||COLORS.blue;return `--event-bg:${color.bg};--event-text:${color.text};--event-color:${color.edge}`;}
+/** Renvoie les événements qui chevauchent l'intervalle [start, end). */
 function visibleEvents(start,end){return events.filter(event=>event.start<end&&event.end>start);}
+/** Déplace la période affichée selon la vue active, puis actualise le calendrier. */
 function movePeriod(direction){if(currentView==="month")currentDate=addMonths(currentDate,direction);else currentDate=addDays(currentDate,direction*(currentView==="week"?7:1));render();}
+/** Choisit et affiche le rendu adapté à la vue calendrier sélectionnée. */
 function render(){if(currentView==="month")renderMonth();else renderTimeView(currentView==="week"?7:1);}
 
+/** Construit la grille mensuelle et relie ses cases et événements aux actions. */
 function renderMonth(){
   titleElement.textContent=currentDate.toLocaleDateString("fr-FR",{month:"long",year:"numeric"});
   const firstOfMonth=new Date(currentDate.getFullYear(),currentDate.getMonth(),1);
@@ -76,7 +93,9 @@ function renderMonth(){
   bindEventButtons();
 }
 
+/** Calcule le lundi de la semaine contenant la date indiquée. */
 function startOfWeek(date){return addDays(startOfDay(date),-((date.getDay()+6)%7));}
+/** Construit la vue journalière ou hebdomadaire avec ses créneaux horaires. */
 function renderTimeView(columnCount){
   const weekStart=currentView==="week"?startOfWeek(currentDate):startOfDay(currentDate);
   const dates=Array.from({length:columnCount},(_,index)=>addDays(weekStart,index)), rangeEnd=addDays(dates[dates.length-1],1);
@@ -93,6 +112,7 @@ function renderTimeView(columnCount){
   }));
   bindEventButtons();
 }
+/** Génère les événements horaires visibles dans la colonne d'une journée. */
 function renderTimedEvents(date){
   const dayStart=startOfDay(date), nextDay=addDays(dayStart,1);
   return visibleEvents(dayStart,nextDay).filter(event=>!isAllDay(event)).map(event=>{
@@ -104,9 +124,13 @@ function renderTimedEvents(date){
     return `<button class="timed-event" type="button" data-event-id="${event.id}" style="${eventStyle(event)};top:${top}px;height:${height}px" title="${escapeHtml(event.title)}">${escapeHtml(event.title)}<span>${formatTime(event.start)}–${formatTime(event.end)}</span></button>`;
   }).join("");
 }
+/** Attache le clic d'ouverture aux boutons représentant des événements. */
 function bindEventButtons(){contentElement.querySelectorAll("[data-event-id]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openEditDialog(button.dataset.eventId);}));}
+/** Prépare et ouvre la boîte de dialogue pour créer un événement. */
 function openCreateDialog(start,end){editingEventId=null;form.reset();document.querySelector("#dialogTitle").textContent="Ajouter un événement";titleInput.value="";startInput.value=formatDateTime(start);endInput.value=formatDateTime(end);colorInput.value="blue";deleteButton.hidden=true;errorElement.textContent="";dialog.showModal();titleInput.focus();}
+/** Charge les données de l'événement choisi dans la boîte de modification. */
 function openEditDialog(id){const event=events.find(item=>item.id===id);if(!event)return;editingEventId=id;document.querySelector("#dialogTitle").textContent="Modifier l’événement";titleInput.value=event.title;startInput.value=formatDateTime(event.start);endInput.value=formatDateTime(event.end);colorInput.value=event.color;deleteButton.hidden=false;errorElement.textContent="";dialog.showModal();titleInput.focus();}
+/** Valide le formulaire, crée ou met à jour l'événement, puis rafraîchit la vue. */
 function saveEvent(event){
   event.preventDefault();const title=titleInput.value.trim(),start=fromDateTime(startInput.value),end=fromDateTime(endInput.value);
   if(!title){errorElement.textContent="Veuillez saisir un titre.";return;}
@@ -115,6 +139,9 @@ function saveEvent(event){
   else events.push({id:`event-${Date.now()}-${Math.random().toString(16).slice(2)}`,title,start,end,color:colorInput.value});
   closeDialog();render();
 }
+/** Supprime l'événement en cours de modification et actualise le calendrier. */
 function deleteCurrentEvent(){if(!editingEventId)return;events=events.filter(event=>event.id!==editingEventId);closeDialog();render();}
+/** Ferme la boîte de dialogue uniquement si elle est actuellement ouverte. */
 function closeDialog(){if(dialog.open)dialog.close();}
+/** Échappe les caractères HTML spéciaux avant d'insérer une valeur dans le balisage. */
 function escapeHtml(value){return String(value).replace(/[&<>"']/g,character=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[character]);}
