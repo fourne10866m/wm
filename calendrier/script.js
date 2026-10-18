@@ -1,39 +1,147 @@
 ﻿"use strict";
 
-const HOUR_HEIGHT = 56, FIRST_HOUR = 7, LAST_HOUR = 21;
-const WEEKDAYS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
-const LONG_WEEKDAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
-const COLORS = {
-  blue:{bg:"#eaf0ff",text:"#4058bd",edge:"#6077e8"}, violet:{bg:"#f1ebff",text:"#734fc1",edge:"#9870e8"},
-  green:{bg:"#e8f7f0",text:"#27825b",edge:"#40ae7b"}, orange:{bg:"#fff2e5",text:"#b86c24",edge:"#ed9b4b"}, rose:{bg:"#ffedf0",text:"#b94e68",edge:"#df738c"}
+window.WMCalendar = (() => {
+const DEFAULT_SELECTORS = {
+  title: "#calendarTitle", content: "#calendarContent", dialog: "#eventDialog", form: "#eventForm",
+  eventTitle: "#eventTitle", eventStart: "#eventStart", eventEnd: "#eventEnd", eventColor: "#eventColor",
+  error: "#dialogError", deleteButton: "#deleteEventBtn", dialogTitle: "#dialogTitle",
+  previous: "#prevBtn", next: "#nextBtn", today: "#todayBtn", close: "#closeDialogBtn",
+  cancel: "#cancelBtn", viewButtons: ".view-button"
 };
-const today = startOfDay(new Date());
-let currentDate = new Date(today), currentView = "month", editingEventId = null;
-let events = [
-  {id:"event-1",title:"Lancement du projet",start:new Date(2026,9,20,9,30),end:new Date(2026,9,20,11),color:"blue"},
-  {id:"event-2",title:"Déjeuner avec Camille",start:new Date(2026,9,21,12),end:new Date(2026,9,21,13,30),color:"orange"},
-  {id:"event-3",title:"Atelier de conception",start:new Date(2026,9,22,14),end:new Date(2026,9,22,16),color:"violet"},
-  {id:"event-4",title:"Conférence produit",start:new Date(2026,9,24),end:new Date(2026,9,26),color:"green"},
-  {id:"event-5",title:"Revue hebdomadaire",start:new Date(2026,9,26,10),end:new Date(2026,9,26,11),color:"rose"}
-];
-const titleElement=document.querySelector("#calendarTitle"), contentElement=document.querySelector("#calendarContent");
-const dialog=document.querySelector("#eventDialog"), form=document.querySelector("#eventForm");
-const titleInput=document.querySelector("#eventTitle"), startInput=document.querySelector("#eventStart"), endInput=document.querySelector("#eventEnd");
-const colorInput=document.querySelector("#eventColor"), errorElement=document.querySelector("#dialogError"), deleteButton=document.querySelector("#deleteEventBtn");
 
-document.querySelector("#prevBtn").addEventListener("click",()=>movePeriod(-1));
-document.querySelector("#nextBtn").addEventListener("click",()=>movePeriod(1));
-document.querySelector("#todayBtn").addEventListener("click",()=>{currentDate=new Date(today);render();});
-document.querySelectorAll(".view-button").forEach(button=>button.addEventListener("click",()=>{
-  currentView=button.dataset.view;
-  document.querySelectorAll(".view-button").forEach(item=>item.classList.toggle("is-active",item===button)); render();
-}));
-document.querySelector("#closeDialogBtn").addEventListener("click",closeDialog);
-document.querySelector("#cancelBtn").addEventListener("click",closeDialog);
-deleteButton.addEventListener("click",deleteCurrentEvent);
-form.addEventListener("submit",saveEvent);
-dialog.addEventListener("click",event=>{if(event.target===dialog)closeDialog();});
-render();
+/** Crée un calendrier autonome dans l'élément fourni. */
+function create(root, options = {}) {
+  if (typeof root === "string") root = document.querySelector(root);
+  if (!root || typeof root.querySelector !== "function") throw new TypeError("Un élément racine de calendrier est requis.");
+
+  const selectors = {...DEFAULT_SELECTORS, ...options.selectors};
+  const element = name => root.querySelector(selectors[name]);
+  const requiredElements = Object.keys(DEFAULT_SELECTORS).filter(name => name !== "viewButtons");
+  for (const name of requiredElements) {
+    if (!element(name)) throw new Error(`Élément de calendrier introuvable : ${selectors[name]}`);
+  }
+
+  const HOUR_HEIGHT = options.hourHeight ?? 56, FIRST_HOUR = options.firstHour ?? 7, LAST_HOUR = options.lastHour ?? 21;
+  const WEEKDAYS = options.weekdays ?? ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+  const LONG_WEEKDAYS = options.longWeekdays ?? ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+  const LOCALE = options.locale ?? "fr-FR";
+  const COLORS = {
+    blue:{bg:"#eaf0ff",text:"#4058bd",edge:"#6077e8"}, violet:{bg:"#f1ebff",text:"#734fc1",edge:"#9870e8"},
+    green:{bg:"#e8f7f0",text:"#27825b",edge:"#40ae7b"}, orange:{bg:"#fff2e5",text:"#b86c24",edge:"#ed9b4b"}, rose:{bg:"#ffedf0",text:"#b94e68",edge:"#df738c"},
+    ...options.colors
+  };
+  const todayValue = options.today ? new Date(options.today) : new Date();
+  if (Number.isNaN(todayValue.getTime())) throw new TypeError("La date du jour est invalide.");
+  const today = startOfDay(todayValue);
+  const initialDate = options.initialDate ? new Date(options.initialDate) : today;
+  if (Number.isNaN(initialDate.getTime())) throw new TypeError("La date initiale est invalide.");
+  let currentDate = startOfDay(initialDate);
+  let currentView = options.view ?? "month", editingEventId = null;
+  let events = (options.events ?? []).map(normalizeEvent);
+  if (!["month", "week", "day"].includes(currentView)) throw new RangeError("La vue doit être month, week ou day.");
+  const titleElement = element("title"), contentElement = element("content"), dialog = element("dialog"), form = element("form");
+  const titleInput = element("eventTitle"), startInput = element("eventStart"), endInput = element("eventEnd");
+  const colorInput = element("eventColor"), errorElement = element("error"), deleteButton = element("deleteButton");
+  const viewButtons = root.querySelectorAll(selectors.viewButtons);
+  const listenerController = new AbortController();
+  viewButtons.forEach(button => button.classList.toggle("is-active", button.dataset.view === currentView));
+
+  function listen(target, type, handler) {
+    target.addEventListener(type, handler, {signal: listenerController.signal});
+  }
+
+  listen(element("previous"), "click", () => movePeriod(-1));
+  listen(element("next"), "click", () => movePeriod(1));
+  listen(element("today"), "click", () => { currentDate = new Date(today); render(); });
+  viewButtons.forEach(button => listen(button, "click", () => setView(button.dataset.view)));
+  listen(element("close"), "click", closeDialog);
+  listen(element("cancel"), "click", closeDialog);
+  listen(deleteButton, "click", deleteCurrentEvent);
+  listen(form, "submit", saveEvent);
+  listen(dialog, "click", event => { if (event.target === dialog) closeDialog(); });
+  render();
+
+  return {
+    render,
+    setView,
+    setDate,
+    previous: () => movePeriod(-1),
+    next: () => movePeriod(1),
+    today: () => { currentDate = new Date(today); render(); },
+    getEvents,
+    addEvent,
+    updateEvent,
+    removeEvent,
+    destroy() {
+      listenerController.abort();
+      closeDialog();
+    }
+  };
+
+  function setView(view) {
+    if (!["month", "week", "day"].includes(view)) throw new RangeError("La vue doit être month, week ou day.");
+    currentView = view;
+    viewButtons.forEach(button => button.classList.toggle("is-active", button.dataset.view === view));
+    render();
+  }
+
+  function setDate(date) {
+    const nextDate = new Date(date);
+    if (Number.isNaN(nextDate.getTime())) throw new TypeError("La date du calendrier est invalide.");
+    currentDate = startOfDay(nextDate);
+    render();
+  }
+
+  function getEvents() {
+    return events.map(event => ({...event, start: new Date(event.start), end: new Date(event.end)}));
+  }
+
+  function addEvent(event) {
+    const normalized = normalizeEvent(event);
+    if (events.some(item => item.id === normalized.id)) throw new Error(`Un événement avec l'identifiant ${normalized.id} existe déjà.`);
+    events.push(normalized);
+    render();
+    notifyChange("add", normalized);
+    return {...normalized, start: new Date(normalized.start), end: new Date(normalized.end)};
+  }
+
+  function updateEvent(id, changes) {
+    const index = events.findIndex(event => event.id === String(id));
+    if (index === -1) return null;
+    const updated = normalizeEvent({...events[index], ...changes, id});
+    events[index] = updated;
+    render();
+    notifyChange("update", updated);
+    return {...updated, start: new Date(updated.start), end: new Date(updated.end)};
+  }
+
+  function removeEvent(id) {
+    const index = events.findIndex(event => event.id === String(id));
+    if (index === -1) return false;
+    const [removed] = events.splice(index, 1);
+    render();
+    notifyChange("remove", removed);
+    return true;
+  }
+
+  function notifyChange(action, event) {
+    if (typeof options.onChange === "function") {
+      options.onChange({action, event: {...event, start: new Date(event.start), end: new Date(event.end)}, events: getEvents()});
+    }
+  }
+
+  function normalizeEvent(event) {
+    const start = new Date(event.start), end = new Date(event.end), title = String(event.title ?? "").trim();
+    if (!title) throw new TypeError("Un événement doit avoir un titre.");
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+      throw new RangeError("La date de fin doit être postérieure à la date de début.");
+    }
+    return {id: String(event.id ?? createEventId()), title, start, end, color: event.color ?? "blue"};
+  }
+
+  function createEventId() {
+    return `event-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
 
 /** Retourne une nouvelle date positionnée au début du jour indiqué. */
 function startOfDay(date){return new Date(date.getFullYear(),date.getMonth(),date.getDate());}
@@ -54,7 +162,7 @@ function formatDateTime(date){
 /** Convertit la valeur locale d'un champ date-heure en objet Date. */
 function fromDateTime(value){const [d,t]=value.split("T"),[y,m,day]=d.split("-").map(Number),[h,min]=t.split(":").map(Number);return new Date(y,m-1,day,h,min);}
 /** Formate une heure selon les conventions françaises, sans afficher les secondes. */
-function formatTime(date){return date.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});}
+function formatTime(date){return date.toLocaleTimeString(LOCALE,{hour:"2-digit",minute:"2-digit"});}
 /** Produit les variables CSS correspondant à la couleur d'un événement. */
 function eventStyle(event){const color=COLORS[event.color]||COLORS.blue;return `--event-bg:${color.bg};--event-text:${color.text};--event-color:${color.edge}`;}
 /** Renvoie les événements qui chevauchent l'intervalle [start, end). */
@@ -66,7 +174,7 @@ function render(){if(currentView==="month")renderMonth();else renderTimeView(cur
 
 /** Construit la grille mensuelle et relie ses cases et événements aux actions. */
 function renderMonth(){
-  titleElement.textContent=currentDate.toLocaleDateString("fr-FR",{month:"long",year:"numeric"});
+  titleElement.textContent=currentDate.toLocaleDateString(LOCALE,{month:"long",year:"numeric"});
   const firstOfMonth=new Date(currentDate.getFullYear(),currentDate.getMonth(),1);
   // La grille commence le lundi de la semaine contenant le premier jour du mois.
   // getDay() renvoie 0 pour dimanche ; le modulo décale correctement vers lundi.
@@ -84,10 +192,10 @@ function renderMonth(){
       const classes=["month-cell",date.getMonth()!==currentDate.getMonth()?"is-outside":"",sameDay(date,today)?"is-today":""].filter(Boolean).join(" ");
       const defaultDate=new Date(date.getFullYear(),date.getMonth(),date.getDate(),9);
       return `<div class="${classes}" role="gridcell" data-date="${formatDateTime(defaultDate)}"><span class="day-number">${date.getDate()}</span>
-        ${shown.map(event=>`<button class="event-chip" type="button" data-event-id="${event.id}" style="${eventStyle(event)}" title="${escapeHtml(event.title)}">${isAllDay(event)?"":`${formatTime(event.start)} `}${escapeHtml(event.title)}</button>`).join("")}
+        ${shown.map(event=>`<button class="event-chip" type="button" data-event-id="${escapeHtml(event.id)}" style="${eventStyle(event)}" title="${escapeHtml(event.title)}">${isAllDay(event)?"":`${formatTime(event.start)} `}${escapeHtml(event.title)}</button>`).join("")}
         ${more>0?`<div class="more-events">+ ${more} autre${more>1?"s":""}</div>`:""}</div>`;
     }).join("")}</div>`;
-  contentElement.querySelectorAll(".month-cell").forEach(cell=>cell.addEventListener("click",event=>{
+  contentElement.querySelectorAll(".month-cell").forEach(cell=>listen(cell,"click",event=>{
     if(event.target.closest("[data-event-id]"))return;const start=fromDateTime(cell.dataset.date);openCreateDialog(start,new Date(start.getTime()+3600000));
   }));
   bindEventButtons();
@@ -99,15 +207,15 @@ function startOfWeek(date){return addDays(startOfDay(date),-((date.getDay()+6)%7
 function renderTimeView(columnCount){
   const weekStart=currentView==="week"?startOfWeek(currentDate):startOfDay(currentDate);
   const dates=Array.from({length:columnCount},(_,index)=>addDays(weekStart,index)), rangeEnd=addDays(dates[dates.length-1],1);
-  if(currentView==="day")titleElement.textContent=currentDate.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-  else{const weekEnd=addDays(weekStart,6);titleElement.textContent=`${weekStart.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} – ${weekEnd.toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})}`;}
+  if(currentView==="day")titleElement.textContent=currentDate.toLocaleDateString(LOCALE,{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+  else{const weekEnd=addDays(weekStart,6);titleElement.textContent=`${weekStart.toLocaleDateString(LOCALE,{day:"numeric",month:"short"})} – ${weekEnd.toLocaleDateString(LOCALE,{day:"numeric",month:"short",year:"numeric"})}`;}
   const allDayEvents=visibleEvents(weekStart,rangeEnd).filter(isAllDay);
   const headers=dates.map((date,index)=>`<div class="time-day-heading ${sameDay(date,today)?"is-today":""}>${currentView==="week"?WEEKDAYS[index]:LONG_WEEKDAYS[(date.getDay()+6)%7]}<strong>${date.getDate()}</strong></div>`).join("");
   const rows=[];
-  for(let hour=FIRST_HOUR;hour<LAST_HOUR;hour++)rows.push(`<div class="time-row"><div class="time-label">${String(hour).padStart(2,"0")}:00</div>${dates.map(date=>`<div class="time-slot" data-date="${formatDateTime(new Date(date.getFullYear(),date.getMonth(),date.getDate(),hour))}" aria-label="${date.toLocaleDateString("fr-FR")} à ${hour} heures">${hour===FIRST_HOUR?renderTimedEvents(date):""}</div>`).join("")}</div>`);
-  contentElement.innerHTML=`<div class="time-grid" style="--columns:${columnCount}"><div class="time-header"><div class="time-header-spacer"></div>${headers}</div>
-    <div class="all-day-row"><div class="all-day-label">Journée</div>${dates.map(date=>`<div class="all-day-cell">${allDayEvents.filter(event=>event.start<addDays(date,1)&&event.end>date).map(event=>`<button class="all-day-event" type="button" data-event-id="${event.id}" style="${eventStyle(event)}">${escapeHtml(event.title)}</button>`).join("")}</div>`).join("")}</div>${rows.join("")}</div>`;
-  contentElement.querySelectorAll(".time-slot").forEach(slot=>slot.addEventListener("click",event=>{
+  for(let hour=FIRST_HOUR;hour<LAST_HOUR;hour++)rows.push(`<div class="time-row"><div class="time-label">${String(hour).padStart(2,"0")}:00</div>${dates.map(date=>`<div class="time-slot" data-date="${formatDateTime(new Date(date.getFullYear(),date.getMonth(),date.getDate(),hour))}" aria-label="${date.toLocaleDateString(LOCALE)} à ${hour} heures">${hour===FIRST_HOUR?renderTimedEvents(date):""}</div>`).join("")}</div>`);
+  contentElement.innerHTML=`<div class="time-grid" style="--columns:${columnCount};--hour-height:${HOUR_HEIGHT}px"><div class="time-header"><div class="time-header-spacer"></div>${headers}</div>
+    <div class="all-day-row"><div class="all-day-label">Journée</div>${dates.map(date=>`<div class="all-day-cell">${allDayEvents.filter(event=>event.start<addDays(date,1)&&event.end>date).map(event=>`<button class="all-day-event" type="button" data-event-id="${escapeHtml(event.id)}" style="${eventStyle(event)}">${escapeHtml(event.title)}</button>`).join("")}</div>`).join("")}</div>${rows.join("")}</div>`;
+  contentElement.querySelectorAll(".time-slot").forEach(slot=>listen(slot,"click",event=>{
     if(event.target.closest("[data-event-id]"))return;const start=fromDateTime(slot.dataset.date);openCreateDialog(start,new Date(start.getTime()+3600000));
   }));
   bindEventButtons();
@@ -121,27 +229,46 @@ function renderTimedEvents(date){
     const visibleStart=Math.max(startMinutes,FIRST_HOUR*60),visibleEnd=Math.min(endMinutes,LAST_HOUR*60);
     if(visibleEnd<=visibleStart)return "";
     const top=((visibleStart-FIRST_HOUR*60)/60)*HOUR_HEIGHT,height=Math.max(22,((visibleEnd-visibleStart)/60)*HOUR_HEIGHT-3);
-    return `<button class="timed-event" type="button" data-event-id="${event.id}" style="${eventStyle(event)};top:${top}px;height:${height}px" title="${escapeHtml(event.title)}">${escapeHtml(event.title)}<span>${formatTime(event.start)}–${formatTime(event.end)}</span></button>`;
+    return `<button class="timed-event" type="button" data-event-id="${escapeHtml(event.id)}" style="${eventStyle(event)};top:${top}px;height:${height}px" title="${escapeHtml(event.title)}">${escapeHtml(event.title)}<span>${formatTime(event.start)}–${formatTime(event.end)}</span></button>`;
   }).join("");
 }
 /** Attache le clic d'ouverture aux boutons représentant des événements. */
-function bindEventButtons(){contentElement.querySelectorAll("[data-event-id]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openEditDialog(button.dataset.eventId);}));}
+function bindEventButtons(){contentElement.querySelectorAll("[data-event-id]").forEach(button=>listen(button,"click",event=>{event.stopPropagation();openEditDialog(button.dataset.eventId);}));}
 /** Prépare et ouvre la boîte de dialogue pour créer un événement. */
-function openCreateDialog(start,end){editingEventId=null;form.reset();document.querySelector("#dialogTitle").textContent="Ajouter un événement";titleInput.value="";startInput.value=formatDateTime(start);endInput.value=formatDateTime(end);colorInput.value="blue";deleteButton.hidden=true;errorElement.textContent="";dialog.showModal();titleInput.focus();}
+function openCreateDialog(start,end){editingEventId=null;form.reset();element("dialogTitle").textContent="Ajouter un événement";titleInput.value="";startInput.value=formatDateTime(start);endInput.value=formatDateTime(end);colorInput.value="blue";deleteButton.hidden=true;errorElement.textContent="";dialog.showModal();titleInput.focus();}
 /** Charge les données de l'événement choisi dans la boîte de modification. */
-function openEditDialog(id){const event=events.find(item=>item.id===id);if(!event)return;editingEventId=id;document.querySelector("#dialogTitle").textContent="Modifier l’événement";titleInput.value=event.title;startInput.value=formatDateTime(event.start);endInput.value=formatDateTime(event.end);colorInput.value=event.color;deleteButton.hidden=false;errorElement.textContent="";dialog.showModal();titleInput.focus();}
+function openEditDialog(id){const event=events.find(item=>item.id===id);if(!event)return;editingEventId=id;element("dialogTitle").textContent="Modifier l’événement";titleInput.value=event.title;startInput.value=formatDateTime(event.start);endInput.value=formatDateTime(event.end);colorInput.value=event.color;deleteButton.hidden=false;errorElement.textContent="";dialog.showModal();titleInput.focus();}
 /** Valide le formulaire, crée ou met à jour l'événement, puis rafraîchit la vue. */
 function saveEvent(event){
   event.preventDefault();const title=titleInput.value.trim(),start=fromDateTime(startInput.value),end=fromDateTime(endInput.value);
   if(!title){errorElement.textContent="Veuillez saisir un titre.";return;}
   if(Number.isNaN(start.getTime())||Number.isNaN(end.getTime())||end<=start){errorElement.textContent="L’heure de fin doit être postérieure à l’heure de début.";return;}
-  if(editingEventId){const existing=events.find(item=>item.id===editingEventId);Object.assign(existing,{title,start,end,color:colorInput.value});}
-  else events.push({id:`event-${Date.now()}-${Math.random().toString(16).slice(2)}`,title,start,end,color:colorInput.value});
-  closeDialog();render();
+  if(editingEventId)updateEvent(editingEventId,{title,start,end,color:colorInput.value});
+  else addEvent({title,start,end,color:colorInput.value});
+  closeDialog();
 }
 /** Supprime l'événement en cours de modification et actualise le calendrier. */
-function deleteCurrentEvent(){if(!editingEventId)return;events=events.filter(event=>event.id!==editingEventId);closeDialog();render();}
+function deleteCurrentEvent(){if(!editingEventId)return;removeEvent(editingEventId);closeDialog();}
 /** Ferme la boîte de dialogue uniquement si elle est actuellement ouverte. */
 function closeDialog(){if(dialog.open)dialog.close();}
 /** Échappe les caractères HTML spéciaux avant d'insérer une valeur dans le balisage. */
 function escapeHtml(value){return String(value).replace(/[&<>"']/g,character=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[character]);}
+
+}
+
+return Object.freeze({create});
+})();
+
+const demoRoot = document.querySelector("[data-calendar-demo]");
+if (demoRoot) {
+  window.demoCalendar = window.WMCalendar.create(demoRoot, {
+    initialDate: new Date(2026, 9, 1),
+    events: [
+      {id:"event-1",title:"Lancement du projet",start:new Date(2026,9,20,9,30),end:new Date(2026,9,20,11),color:"blue"},
+      {id:"event-2",title:"Déjeuner avec Camille",start:new Date(2026,9,21,12),end:new Date(2026,9,21,13,30),color:"orange"},
+      {id:"event-3",title:"Atelier de conception",start:new Date(2026,9,22,14),end:new Date(2026,9,22,16),color:"violet"},
+      {id:"event-4",title:"Conférence produit",start:new Date(2026,9,24),end:new Date(2026,9,26),color:"green"},
+      {id:"event-5",title:"Revue hebdomadaire",start:new Date(2026,9,26,10),end:new Date(2026,9,26,11),color:"rose"}
+    ]
+  });
+}

@@ -285,7 +285,7 @@ button {
 }
 
 .time-label {
-   height: 56px;
+   height: var(--hour-height, 56px);
    padding: 0 8px;
    transform: translateY(-7px);
    color: #969eae;
@@ -295,7 +295,7 @@ button {
 }
 
 .time-row {
-   min-height: 56px
+   min-height: var(--hour-height, 56px)
 }
 
 .time-slot {
