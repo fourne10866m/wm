@@ -1,0 +1,18 @@
+div.groupe {
+  padding: 1rem;
+  border: 1px solid green;
+}
+
+div.item {
+  padding: 0.5rem;
+  margin: 0.5rem;
+  border: 1px solid red;
+  background-color: pink;
+  cursor: grab;
+  border-radius:4px;
+}
+
+div.item.en-deplacement {
+  opacity: 0.5;
+  cursor: grabbing;
+}

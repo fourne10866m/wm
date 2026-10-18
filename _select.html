@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="Content-Language" content="fr" />
+  <title>Select personnalisé avec icônes SVG</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      color: #192e2a;
+      background: #f2f5f0;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        linear-gradient(135deg, rgba(217, 231, 218, .55), transparent 48%),
+        #f2f5f0;
+    }
+
+    main { width: min(100%, 440px); }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: #42766a;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 28px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 30px;
+      font-weight: 500;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 9px;
+      font-size: 14px;
+      font-weight: 650;
+    }
+
+    .select-wrap { position: relative; }
+
+    .select-trigger {
+      width: 100%;
+      min-height: 62px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      border: 1px solid #b9c9bf;
+      border-radius: 7px;
+      background: #fff;
+      color: inherit;
+      text-align: left;
+      cursor: pointer;
+      box-shadow: 0 3px 10px rgba(31, 60, 48, .06);
+    }
+
+    .select-trigger:hover, .select-trigger[aria-expanded="true"] {
+      border-color: #42766a;
+    }
+
+    .select-trigger:focus-visible, .option:focus-visible {
+      outline: 3px solid #e2a83b;
+      outline-offset: 3px;
+    }
+
+    .selected-icon, .option-icon {
+      width: 38px;
+      height: 38px;
+      flex: 0 0 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 5px;
+      background: #eaf1eb;
+      color: #397166;
+    }
+
+    .selected-icon svg, .option-icon svg { width: 23px; height: 23px; }
+
+    .selected-copy, .option-copy { display: grid; gap: 3px; }
+    .selected-copy strong, .option-copy strong { font-size: 14px; }
+    .selected-copy small, .option-copy small { color: #65776e; font-size: 12px; }
+
+    .chevron {
+      width: 17px;
+      height: 17px;
+      margin-left: auto;
+      color: #62736b;
+      transition: transform .16s ease;
+    }
+
+    .select-trigger[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+
+    .options {
+      position: absolute;
+      z-index: 2;
+      top: calc(100% + 7px);
+      right: 0;
+      left: 0;
+      display: none;
+      padding: 5px;
+      border: 1px solid #cbd6ce;
+      border-radius: 7px;
+      background: #fff;
+      box-shadow: 0 12px 28px rgba(31, 60, 48, .14);
+    }
+
+    .options[data-open="true"] { display: grid; }
+
+    .option {
+      min-height: 58px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 8px 10px;
+      border: 0;
+      border-radius: 4px;
+      background: transparent;
+      color: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .option:hover, .option.is-active, .option[aria-selected="true"] { background: #eef4ef; }
+    .option[aria-selected="true"] .option-copy strong { color: #286254; }
+
+    .selection {
+      min-height: 22px;
+      margin: 14px 0 0;
+      color: #65776e;
+      font-size: 13px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">Contrôle cartographique</p>
+    <h1>Choisir un fond de carte</h1>
+
+    <label id="basemap-label">Fond de carte</label>
+    <div class="select-wrap" id="basemap-select">
+      <button class="select-trigger" id="basemap-trigger" type="button" role="combobox"
+          aria-labelledby="basemap-label selected-name" aria-haspopup="listbox"
+          aria-expanded="false" aria-controls="basemap-options" aria-activedescendant="option-plan">
+        <span class="selected-icon" id="selected-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m3 7 6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13m6-10v13"/><path d="m5 9 2-1m10 2 3-1"/></svg>
+        </span>
+        <span class="selected-copy">
+          <strong id="selected-name">Plan de ville</strong>
+          <small id="selected-description">Rues et repères</small>
+        </span>
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+
+      <div class="options" id="basemap-options" role="listbox" aria-labelledby="basemap-label">
+        <div class="option" id="option-plan" role="option" aria-selected="true" tabindex="-1" data-value="plan" data-label="Plan de ville" data-description="Rues et repères">
+          <span class="option-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m3 7 6-3 6 3 6-3v13l-6 3-6-3-6 3z"/><path d="M9 4v13m6-10v13"/><path d="m5 9 2-1m10 2 3-1"/></svg></span>
+          <span class="option-copy"><strong>Plan de ville</strong><small>Rues et repères</small></span>
+        </div>
+        <div class="option" id="option-satellite" role="option" aria-selected="false" tabindex="-1" data-value="satellite" data-label="Satellite" data-description="Vue aérienne">
+          <span class="option-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m8 8 8 8m-10-1 6-6m-4-4 9 9m-11 7 5-5m2-2 5-5m1 1 2-2-3-3-2 2"/><path d="m3 21 5-1-4-4z"/></svg></span>
+          <span class="option-copy"><strong>Satellite</strong><small>Vue aérienne</small></span>
+        </div>
+        <div class="option" id="option-relief" role="option" aria-selected="false" tabindex="-1" data-value="relief" data-label="Relief" data-description="Altitudes et terrain">
+          <span class="option-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m2.5 18 6.2-10 3.8 5 2.4-3 6.6 8z"/><path d="m6 12 2.7 1.1 1.6-1.2m3.1.1 2.2 1.2 2.7-.5"/><path d="M4 21h16"/></svg></span>
+          <span class="option-copy"><strong>Relief</strong><small>Altitudes et terrain</small></span>
+        </div>
+        <div class="option" id="option-cadastre" role="option" aria-selected="false" tabindex="-1" data-value="cadastre" data-label="Cadastre" data-description="Parcelles et limites">
+          <span class="option-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h8v7H3zM13 4h8v5h-8zM13 11h8v9h-8zM3 13h8v7H3z"/><path d="M7 7h.01M17 7h.01M17 15h.01M7 16h.01"/></svg></span>
+          <span class="option-copy"><strong>Cadastre</strong><small>Parcelles et limites</small></span>
+        </div>
+      </div>
+    </div>
+    <p class="selection" id="selection-status" aria-live="polite">Sélection actuelle : Plan de ville</p>
+ 
+ 
+ 
+ <form>
+  <p>
+    <label for="pet-select">Sélectionnez un personnage&nbsp;:</label>
+    <select id="pet-select">
+      <!-- <button>
+        <selectedcontent></selectedcontent>
+      </button> -->
+
+      <option value="">Veuillez sélectionner un personnage</option>
+      <option value="gustave">
+        <span class="icon" aria-hidden="true">🦾</span
+        ><span class="option-label">Gustave</span>
+      </option>
+      <option value="lune">
+        <span class="icon" aria-hidden="true">🌙</span
+        ><span class="option-label">Lune</span>
+      </option>
+      <option value="maelle">
+        <span class="icon" aria-hidden="true">🤺</span
+        ><span class="option-label">Maelle</span>
+      </option>
+      <option value="sciel">
+        <span class="icon" aria-hidden="true">🃏</span
+        ><span class="option-label">Sciel</span>
+      </option>
+      <option value="esquie">
+        <span class="icon" aria-hidden="true">🧸</span
+        ><span class="option-label">Esquie</span>
+      </option>
+      <option value="verso">
+        <span class="icon" aria-hidden="true">⚔️</span
+        ><span class="option-label">Verso</span>
+      </option>
+      <option value="monoco">
+        <span class="icon" aria-hidden="true">🦶🏻</span
+        ><span class="option-label">Monoco</span>
+      </option>
+    </select>
+  </p>
+</form>
+
+  </main>
+
+
+
+
+  <script>
+    (function () {
+      var root = document.getElementById('basemap-select');
+      var trigger = document.getElementById('basemap-trigger');
+      var listbox = document.getElementById('basemap-options');
+      var options = Array.prototype.slice.call(listbox.querySelectorAll('[role="option"]'));
+      var selectedIcon = document.getElementById('selected-icon');
+      var selectedName = document.getElementById('selected-name');
+      var selectedDescription = document.getElementById('selected-description');
+      var status = document.getElementById('selection-status');
+      var activeIndex = 0;
+
+      function setActive(index) {
+        activeIndex = (index + options.length) % options.length;
+        trigger.setAttribute('aria-activedescendant', options[activeIndex].id);
+        options.forEach(function (option, optionIndex) {
+          option.classList.toggle('is-active', optionIndex === activeIndex);
+        });
+        options[activeIndex].scrollIntoView({ block: 'nearest' });
+      }
+
+      function openList() {
+        listbox.dataset.open = 'true';
+        trigger.setAttribute('aria-expanded', 'true');
+        setActive(options.findIndex(function (option) {
+          return option.getAttribute('aria-selected') === 'true';
+        }));
+      }
+
+      function closeList() {
+        delete listbox.dataset.open;
+        trigger.setAttribute('aria-expanded', 'false');
+      }
+
+      function selectOption(option) {
+        options.forEach(function (item) {
+          item.setAttribute('aria-selected', String(item === option));
+        });
+        selectedIcon.innerHTML = option.querySelector('svg').outerHTML;
+        selectedName.textContent = option.dataset.label;
+        selectedDescription.textContent = option.dataset.description;
+        status.textContent = 'Sélection actuelle : ' + option.dataset.label;
+        closeList();
+        trigger.focus();
+      }
+
+      trigger.addEventListener('click', function () {
+        if (trigger.getAttribute('aria-expanded') === 'true') closeList();
+        else openList();
+      });
+
+      trigger.addEventListener('keydown', function (event) {
+        var isOpen = trigger.getAttribute('aria-expanded') === 'true';
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          if (!isOpen) openList();
+          else setActive(activeIndex + (event.key === 'ArrowDown' ? 1 : -1));
+        } else if (event.key === 'Home' || event.key === 'End') {
+          event.preventDefault();
+          if (!isOpen) openList();
+          setActive(event.key === 'Home' ? 0 : options.length - 1);
+        } else if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          if (isOpen) selectOption(options[activeIndex]);
+          else openList();
+        } else if (event.key === 'Escape' && isOpen) {
+          closeList();
+        } else if (event.key === 'Tab') {
+          closeList();
+        }
+      });
+
+      options.forEach(function (option, index) {
+        option.addEventListener('mouseenter', function () { setActive(index); });
+        option.addEventListener('click', function () { selectOption(option); });
+      });
+
+      document.addEventListener('click', function (event) {
+        if (!root.contains(event.target)) closeList();
+      });
+    }());
+  </script>
+</body>
+</html>
