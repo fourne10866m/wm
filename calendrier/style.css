@@ -274,6 +274,20 @@ button {
    background: #fafbff
 }
 
+.month-cell.is-range-selected {
+   background: #e9edff;
+   box-shadow: inset 0 0 0 2px #8794ef
+}
+
+.calendar-content.is-selecting-range,
+.calendar-content.is-selecting-range * {
+   user-select: none
+}
+
+.calendar-content.is-selecting-range .month-cell {
+   cursor: crosshair
+}
+
 .month-cell.is-outside .day-number {
    color: #b9bfcc
 }

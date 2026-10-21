@@ -23,12 +23,11 @@ const CALENDAR_MARKUP = `
     <div class="toolbar__view" role="group" aria-label="Choisir une vue">
       <button class="view-button is-active" data-view="month" type="button">Mois</button>
       <button class="view-button" data-view="week" type="button">Semaine</button>
-      <button class="view-button" data-view="day" type="button">Jour</button>
       <button class="view-button" data-view="year" type="button">Année</button>
     </div>
   </header>
   <section class="calendar-content" id="calendarContent" aria-label="Vue du calendrier"></section>
-  <p class="calendar-hint">Cliquez sur une date ou un créneau pour ajouter un événement. Cliquez sur un événement pour le modifier ou le supprimer.</p>
+  <p class="calendar-hint">Cliquez sur une date ou un créneau pour ajouter un événement. Dans la vue Mois, faites glisser la souris sur plusieurs jours pour créer un événement sur toute la plage. Cliquez sur un événement pour le modifier ou le supprimer.</p>
   <dialog class="event-dialog" id="eventDialog" aria-labelledby="dialogTitle">
     <form id="eventForm">
       <div class="dialog-header"><div><p class="dialog-eyebrow">Événement</p><h2 id="dialogTitle">Ajouter un événement</h2></div><button class="icon-button dialog-close" id="closeDialogBtn" type="button" aria-label="Fermer">×</button></div>
@@ -59,7 +58,6 @@ function create(root, options = {}) {
 
   const HOUR_HEIGHT = options.hourHeight ?? 56, FIRST_HOUR = options.firstHour ?? 7, LAST_HOUR = options.lastHour ?? 21;
   const WEEKDAYS = options.weekdays ?? ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
-  const LONG_WEEKDAYS = options.longWeekdays ?? ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
   const LOCALE = options.locale ?? "fr-FR";
   const COLORS = {
     blue:{bg:"#eaf0ff",text:"#4058bd",edge:"#6077e8"}, violet:{bg:"#f1ebff",text:"#734fc1",edge:"#9870e8"},
@@ -74,12 +72,13 @@ function create(root, options = {}) {
   let currentDate = startOfDay(initialDate);
   let currentView = options.view ?? "month", editingEventId = null;
   let events = (options.events ?? []).map(normalizeEvent);
-  if (!["month", "week", "day", "year"].includes(currentView)) throw new RangeError("La vue doit être month, week, day ou year.");
+  if (!["month", "week", "year"].includes(currentView)) throw new RangeError("La vue doit être month, week ou year.");
   const titleElement = element("title"), contentElement = element("content"), dialog = element("dialog"), form = element("form");
   const titleInput = element("eventTitle"), startInput = element("eventStart"), endInput = element("eventEnd");
   const colorInput = element("eventColor"), errorElement = element("error"), deleteButton = element("deleteButton");
   const viewButtons = root.querySelectorAll(selectors.viewButtons);
   const listenerController = new AbortController();
+  let monthSelection = null, suppressMonthClick = false, suppressMonthClickTimer;
   viewButtons.forEach(button => button.classList.toggle("is-active", button.dataset.view === currentView));
 
   function listen(target, type, handler) {
@@ -103,6 +102,46 @@ function create(root, options = {}) {
       currentDate = startOfDay(fromDateTime(dateButton.dataset.yearDate));
       setView("month");
     }
+  });
+  listen(contentElement, "pointerdown", event => {
+    if (currentView !== "month" || event.button !== 0 || event.target.closest("[data-event-id]")) return;
+    const cell = event.target.closest(".month-cell");
+    if (!cell) return;
+    const date = startOfDay(fromDateTime(cell.dataset.date));
+    monthSelection = {pointerId: event.pointerId, start: date, end: date, moved: false};
+    contentElement.classList.add("is-selecting-range");
+  });
+  listen(document, "pointermove", event => {
+    if (!monthSelection || event.pointerId !== monthSelection.pointerId) return;
+    const cell = document.elementFromPoint(event.clientX, event.clientY)?.closest(".month-cell");
+    if (!cell) return;
+    const date = startOfDay(fromDateTime(cell.dataset.date));
+    if (!sameDay(date, monthSelection.end)) {
+      monthSelection.end = date;
+      monthSelection.moved = true;
+      updateMonthSelection();
+      if (monthSelection.moved) event.preventDefault();
+    }
+  });
+  listen(document, "pointerup", event => {
+    if (!monthSelection || event.pointerId !== monthSelection.pointerId) return;
+    const selection = monthSelection;
+    monthSelection = null;
+    contentElement.classList.remove("is-selecting-range");
+    updateMonthSelection();
+    if (!selection.moved) return;
+    suppressMonthClick = true;
+    clearTimeout(suppressMonthClickTimer);
+    suppressMonthClickTimer = setTimeout(() => { suppressMonthClick = false; }, 100);
+    const start = selection.start < selection.end ? selection.start : selection.end;
+    const lastDay = selection.start > selection.end ? selection.start : selection.end;
+    openCreateDialog(start, addDays(lastDay, 1));
+  });
+  listen(document, "pointercancel", event => {
+    if (!monthSelection || event.pointerId !== monthSelection.pointerId) return;
+    monthSelection = null;
+    contentElement.classList.remove("is-selecting-range");
+    updateMonthSelection();
   });
   listen(element("close"), "click", closeDialog);
   listen(element("cancel"), "click", closeDialog);
@@ -129,7 +168,7 @@ function create(root, options = {}) {
   };
 
   function setView(view) {
-    if (!["month", "week", "day", "year"].includes(view)) throw new RangeError("La vue doit être month, week, day ou year.");
+    if (!["month", "week", "year"].includes(view)) throw new RangeError("La vue doit être month, week ou year.");
     currentView = view;
     viewButtons.forEach(button => button.classList.toggle("is-active", button.dataset.view === view));
     render();
@@ -224,11 +263,11 @@ function movePeriod(direction){
     currentDate=new Date(year,month,Math.min(currentDate.getDate(),new Date(year,month+1,0).getDate()));
   }
   else if(currentView==="month")currentDate=addMonths(currentDate,direction);
-  else currentDate=addDays(currentDate,direction*(currentView==="week"?7:1));
+  else currentDate=addDays(currentDate,direction*7);
   render();
 }
 /** Choisit et affiche le rendu adapté à la vue calendrier sélectionnée. */
-function render(){if(currentView==="year")renderYear();else if(currentView==="month")renderMonth();else renderTimeView(currentView==="week"?7:1);}
+function render(){if(currentView==="year")renderYear();else if(currentView==="month")renderMonth();else renderTimeView();}
 
 /** Construit une vue annuelle compacte avec navigation vers chacun des mois et jours. */
 function renderYear(){
@@ -280,24 +319,34 @@ function renderMonth(){
         ${more>0?`<div class="more-events">+ ${more} autre${more>1?"s":""}</div>`:""}</div>`;
     }).join("")}</div>`;
   contentElement.querySelectorAll(".month-cell").forEach(cell=>listen(cell,"click",event=>{
+    if(suppressMonthClick){suppressMonthClick=false;clearTimeout(suppressMonthClickTimer);return;}
     if(event.target.closest("[data-event-id]"))return;const start=fromDateTime(cell.dataset.date);openCreateDialog(start,new Date(start.getTime()+3600000));
   }));
+  updateMonthSelection();
   bindEventButtons();
+}
+
+function updateMonthSelection(){
+  contentElement.querySelectorAll(".month-cell").forEach(cell=>{
+    const date=startOfDay(fromDateTime(cell.dataset.date));
+    const start=monthSelection?monthSelection.start:null,end=monthSelection?monthSelection.end:null;
+    cell.classList.toggle("is-range-selected",!!start&&date>= (start<end?start:end)&&date<= (start>end?start:end));
+  });
 }
 
 /** Calcule le lundi de la semaine contenant la date indiquée. */
 function startOfWeek(date){return addDays(startOfDay(date),-((date.getDay()+6)%7));}
-/** Construit la vue journalière ou hebdomadaire avec ses créneaux horaires. */
-function renderTimeView(columnCount){
-  const weekStart=currentView==="week"?startOfWeek(currentDate):startOfDay(currentDate);
-  const dates=Array.from({length:columnCount},(_,index)=>addDays(weekStart,index)), rangeEnd=addDays(dates[dates.length-1],1);
-  if(currentView==="day")titleElement.textContent=currentDate.toLocaleDateString(LOCALE,{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-  else{const weekEnd=addDays(weekStart,6);titleElement.textContent=`${weekStart.toLocaleDateString(LOCALE,{day:"numeric",month:"short"})} – ${weekEnd.toLocaleDateString(LOCALE,{day:"numeric",month:"short",year:"numeric"})}`;}
+/** Construit la vue hebdomadaire avec ses créneaux horaires. */
+function renderTimeView(){
+  const weekStart=startOfWeek(currentDate);
+  const dates=Array.from({length:7},(_,index)=>addDays(weekStart,index)), rangeEnd=addDays(dates[dates.length-1],1);
+  const weekEnd=addDays(weekStart,6);
+  titleElement.textContent=`${weekStart.toLocaleDateString(LOCALE,{day:"numeric",month:"short"})} – ${weekEnd.toLocaleDateString(LOCALE,{day:"numeric",month:"short",year:"numeric"})}`;
   const allDayEvents=visibleEvents(weekStart,rangeEnd).filter(isAllDay);
-  const headers=dates.map((date,index)=>`<div class="time-day-heading ${sameDay(date,today)?"is-today":""}>${currentView==="week"?WEEKDAYS[index]:LONG_WEEKDAYS[(date.getDay()+6)%7]}<strong>${date.getDate()}</strong></div>`).join("");
+  const headers=dates.map((date,index)=>`<div class="time-day-heading ${sameDay(date,today)?"is-today":""}">${WEEKDAYS[index]}<strong>${date.getDate()}</strong></div>`).join("");
   const rows=[];
   for(let hour=FIRST_HOUR;hour<LAST_HOUR;hour++)rows.push(`<div class="time-row"><div class="time-label">${String(hour).padStart(2,"0")}:00</div>${dates.map(date=>`<div class="time-slot" data-date="${formatDateTime(new Date(date.getFullYear(),date.getMonth(),date.getDate(),hour))}" aria-label="${date.toLocaleDateString(LOCALE)} à ${hour} heures">${hour===FIRST_HOUR?renderTimedEvents(date):""}</div>`).join("")}</div>`);
-  contentElement.innerHTML=`<div class="time-grid" style="--columns:${columnCount};--hour-height:${HOUR_HEIGHT}px"><div class="time-header"><div class="time-header-spacer"></div>${headers}</div>
+  contentElement.innerHTML=`<div class="time-grid" style="--columns:7;--hour-height:${HOUR_HEIGHT}px"><div class="time-header"><div class="time-header-spacer"></div>${headers}</div>
     <div class="all-day-row"><div class="all-day-label">Journée</div>${dates.map(date=>`<div class="all-day-cell">${allDayEvents.filter(event=>event.start<addDays(date,1)&&event.end>date).map(event=>`<button class="all-day-event" type="button" data-event-id="${escapeHtml(event.id)}" style="${eventStyle(event)}">${escapeHtml(event.title)}</button>`).join("")}</div>`).join("")}</div>${rows.join("")}</div>`;
   contentElement.querySelectorAll(".time-slot").forEach(slot=>listen(slot,"click",event=>{
     if(event.target.closest("[data-event-id]"))return;const start=fromDateTime(slot.dataset.date);openCreateDialog(start,new Date(start.getTime()+3600000));
