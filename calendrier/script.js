@@ -9,12 +9,47 @@ const DEFAULT_SELECTORS = {
   cancel: "#cancelBtn", viewButtons: ".view-button"
 };
 
+const CALENDAR_MARKUP = `
+  <header class="toolbar">
+    <div class="toolbar__brand"><span class="brand-mark" aria-hidden="true">▦</span><h1>Calendrier</h1></div>
+    <div class="toolbar__navigation">
+      <button class="button button--today" id="todayBtn" type="button">Aujourd’hui</button>
+      <div class="nav-arrows" aria-label="Naviguer dans le calendrier">
+        <button class="icon-button" id="prevBtn" type="button" aria-label="Période précédente">‹</button>
+        <button class="icon-button" id="nextBtn" type="button" aria-label="Période suivante">›</button>
+      </div>
+      <h2 id="calendarTitle" aria-live="polite"></h2>
+    </div>
+    <div class="toolbar__view" role="group" aria-label="Choisir une vue">
+      <button class="view-button is-active" data-view="month" type="button">Mois</button>
+      <button class="view-button" data-view="week" type="button">Semaine</button>
+      <button class="view-button" data-view="day" type="button">Jour</button>
+    </div>
+  </header>
+  <section class="calendar-content" id="calendarContent" aria-label="Vue du calendrier"></section>
+  <p class="calendar-hint">Cliquez sur une date ou un créneau pour ajouter un événement. Cliquez sur un événement pour le modifier ou le supprimer.</p>
+  <dialog class="event-dialog" id="eventDialog" aria-labelledby="dialogTitle">
+    <form id="eventForm">
+      <div class="dialog-header"><div><p class="dialog-eyebrow">Événement</p><h2 id="dialogTitle">Ajouter un événement</h2></div><button class="icon-button dialog-close" id="closeDialogBtn" type="button" aria-label="Fermer">×</button></div>
+      <label>Titre<input id="eventTitle" name="title" type="text" maxlength="80" placeholder="Ex. Réunion d’équipe" required></label>
+      <div class="form-row"><label>Début<input id="eventStart" name="start" type="datetime-local" required></label><label>Fin<input id="eventEnd" name="end" type="datetime-local" required></label></div>
+      <label>Couleur<select id="eventColor" name="color"><option value="blue">Bleu</option><option value="violet">Violet</option><option value="green">Vert</option><option value="orange">Orange</option><option value="rose">Rose</option></select></label>
+      <p class="dialog-error" id="dialogError" role="alert"></p>
+      <div class="dialog-actions"><button class="button button--danger" id="deleteEventBtn" type="button" hidden>Supprimer</button><span class="dialog-actions__spacer"></span><button class="button button--secondary" id="cancelBtn" type="button">Annuler</button><button class="button button--primary" type="submit">Enregistrer</button></div>
+    </form>
+  </dialog>`;
+
 /** Crée un calendrier autonome dans l'élément fourni. */
 function create(root, options = {}) {
   if (typeof root === "string") root = document.querySelector(root);
   if (!root || typeof root.querySelector !== "function") throw new TypeError("Un élément racine de calendrier est requis.");
 
   const selectors = {...DEFAULT_SELECTORS, ...options.selectors};
+  if (root.childElementCount === 0) {
+    root.classList.add("calendar");
+    root.setAttribute("aria-label", "Calendrier");
+    root.innerHTML = CALENDAR_MARKUP;
+  }
   const element = name => root.querySelector(selectors[name]);
   const requiredElements = Object.keys(DEFAULT_SELECTORS).filter(name => name !== "viewButtons");
   for (const name of requiredElements) {

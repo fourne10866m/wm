@@ -4,25 +4,27 @@ Utilisation d'Openlayers
 
 ## Calendrier réutilisable
 
-Le fichier `calendrier/script.js` expose l'API globale `WMCalendar`. Pour une initialisation manuelle, reprendre le balisage de `calendrier/index.html` (y compris la boîte de dialogue), donner `id="calendar"` à la racine et retirer son attribut `data-calendar-demo` (qui active l'initialisation automatique de démonstration). Charger `calendrier/style.css` et `calendrier/script.js`, puis créer l'instance :
+Le fichier `calendrier/script.js` expose l'API globale `WMCalendar`. Il génère le balisage du calendrier et de sa boîte de dialogue dans l'élément racine, qui peut donc rester vide. Pour une initialisation manuelle, charger `calendrier/style.css` et `calendrier/script.js`, puis créer l'instance :
 
 ```html
+<link rel="stylesheet" href="calendrier/style.css">
+<div id="calendar"></div>
 <script src="calendrier/script.js" defer></script>
 <script>
-	window.addEventListener("DOMContentLoaded", () => {
-	const calendar = WMCalendar.create(document.querySelector("#calendar"), {
-		initialDate: new Date(),
-		view: "week",
-		events: [
-			{id: "meeting-1", title: "Réunion", start: new Date("2026-10-20T09:00"), end: new Date("2026-10-20T10:00"), color: "blue"}
-		],
-		onChange: ({action, event, events}) => console.log(action, event, events)
-	});
-	});
+window.addEventListener("DOMContentLoaded", () => {
+  const calendar = WMCalendar.create("#calendar", {
+    initialDate: new Date(),
+    view: "week",
+    events: [
+      {id: "meeting-1", title: "Réunion", start: new Date("2026-10-20T09:00"), end: new Date("2026-10-20T10:00"), color: "blue"}
+    ],
+    onChange: ({action, event, events}) => console.log(action, event, events)
+  });
+});
 </script>
 ```
 
-La racine passée à `create(root, options)` doit contenir les éléments du calendrier et sa boîte de dialogue. `root` est un élément DOM ou un sélecteur CSS. Les identifiants par défaut sont ceux du fichier HTML fourni; `options.selectors` permet de les remplacer. Les options de présentation sont `locale`, `view` (`month`, `week` ou `day`), `initialDate`, `today`, `firstHour`, `lastHour`, `hourHeight`, `weekdays`, `longWeekdays` et `colors`. `options.events` initialise les événements; `options.onChange` est appelée après chaque ajout, modification ou suppression.
+La racine passée à `create(root, options)` est un élément DOM ou un sélecteur CSS. Les identifiants par défaut sont générés par le script; `options.selectors` permet de les remplacer si un balisage personnalisé est fourni. Les options de présentation sont `locale`, `view` (`month`, `week` ou `day`), `initialDate`, `today`, `firstHour`, `lastHour`, `hourHeight`, `weekdays`, `longWeekdays` et `colors`. `options.events` initialise les événements; `options.onChange` est appelée après chaque ajout, modification ou suppression.
 
 ### Ajouter un événement
 
@@ -68,4 +70,4 @@ Chaque instance possède son propre état et expose :
 
 Le callback `onChange({action, event, events})` reçoit `action` (`"add"`, `"update"` ou `"remove"`), l'événement concerné et une copie complète de la liste après changement. Il est appelé aussi bien pour les opérations de l'API que pour les actions du formulaire.
 
-La page de démonstration initialise son exemple uniquement sur l'élément marqué `data-calendar-demo`.
+La page de démonstration initialise automatiquement son exemple sur l'élément marqué `data-calendar-demo`.
