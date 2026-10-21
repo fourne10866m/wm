@@ -274,9 +274,35 @@ button {
    background: #fafbff
 }
 
+.month-cell.has-background-range {
+   background: #f0f5e8
+}
+
+.month-cell.has-background-range:hover {
+   background: #e8efdc
+}
+
 .month-cell.is-range-selected {
    background: #e9edff;
    box-shadow: inset 0 0 0 2px #8794ef
+}
+
+.calendar-legend {
+   display: flex;
+   align-items: center;
+   justify-content: flex-end;
+   gap: 7px;
+   padding: 10px 2px 0;
+   color: var(--muted);
+   font-size: 11px
+}
+
+.calendar-legend__swatch {
+   width: 12px;
+   height: 12px;
+   border: 1px solid #dce7ca;
+   border-radius: 3px;
+   background: #f0f5e8
 }
 
 .calendar-content.is-selecting-range,
@@ -294,6 +320,10 @@ button {
 
 .month-cell.is-today {
    background: #f7f8ff
+}
+
+.month-cell.is-today.has-background-range {
+   background: #edf3e3
 }
 
 .day-number {

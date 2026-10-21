@@ -24,7 +24,15 @@ window.addEventListener("DOMContentLoaded", () => {
 </script>
 ```
 
-La racine passée à `create(root, options)` est un élément DOM ou un sélecteur CSS. Les identifiants par défaut sont générés par le script; `options.selectors` permet de les remplacer si un balisage personnalisé est fourni. Les options de présentation sont `locale`, `view` (`year`, `month` ou `week`), `initialDate`, `today`, `firstHour`, `lastHour`, `hourHeight`, `weekdays` et `colors`. `options.events` initialise les événements; `options.onChange` est appelée après chaque ajout, modification ou suppression.
+La racine passée à `create(root, options)` est un élément DOM ou un sélecteur CSS. Les identifiants par défaut sont générés par le script; `options.selectors` permet de les remplacer si un balisage personnalisé est fourni. Les options de présentation sont `locale`, `view` (`year`, `month` ou `week`), `initialDate`, `today`, `firstHour`, `lastHour`, `hourHeight`, `weekdays` et `colors`. `options.events` initialise les événements; `options.onChange` est appelée après chaque ajout, modification ou suppression. `options.backgroundRanges` permet de colorer en arrière-plan des plages de dates dans la vue mensuelle :
+
+```js
+backgroundRanges: [
+  {title: "Vacances scolaires", start: "2026-10-17", end: "2026-11-01"}
+]
+```
+
+Les bornes `start` et `end` sont inclusives et acceptent des chaînes `AAAA-MM-JJ` ou des objets `Date`. Les dates au format `AAAA-MM-JJ` sont interprétées en heure locale. Les plages sont affichées uniquement dans la vue mensuelle.
 
 ### Ajouter un événement
 

@@ -72,6 +72,7 @@ function create(root, options = {}) {
   let currentDate = startOfDay(initialDate);
   let currentView = options.view ?? "month", editingEventId = null;
   let events = (options.events ?? []).map(normalizeEvent);
+  const backgroundRanges = (options.backgroundRanges ?? []).map(normalizeBackgroundRange);
   if (!["month", "week", "year"].includes(currentView)) throw new RangeError("La vue doit être month, week ou year.");
   const titleElement = element("title"), contentElement = element("content"), dialog = element("dialog"), form = element("form");
   const titleInput = element("eventTitle"), startInput = element("eventStart"), endInput = element("eventEnd");
@@ -228,6 +229,33 @@ function create(root, options = {}) {
     return {id: String(event.id ?? createEventId()), title, start, end, color: event.color ?? "blue"};
   }
 
+  function normalizeBackgroundRange(range) {
+    const start = normalizeCalendarDate(range.start), end = normalizeCalendarDate(range.end);
+    const title = String(range.title ?? "").trim();
+    if (!title) throw new TypeError("Une plage de dates doit avoir un titre.");
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+      throw new RangeError("La date de fin d'une plage doit être égale ou postérieure à la date de début.");
+    }
+    return {title, start, end};
+  }
+
+  function normalizeCalendarDate(value) {
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const [year, month, day] = value.split("-").map(Number);
+      const date = new Date(year, month - 1, day);
+      if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+        return new Date(NaN);
+      }
+      return date;
+    }
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? date : startOfDay(date);
+  }
+
+  function backgroundRangesForDate(date) {
+    return backgroundRanges.filter(range => date >= range.start && date <= range.end);
+  }
+
   function createEventId() {
     return `event-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
@@ -312,12 +340,14 @@ function renderMonth(){
       const date=addDays(gridStart,index), nextDate=addDays(date,1);
       const found=visibleEvents(date,nextDate), allDay=found.filter(isAllDay), timed=found.filter(event=>!isAllDay(event));
       const shown=[...allDay,...timed].slice(0,3), more=allDay.length+timed.length-shown.length;
-      const classes=["month-cell",date.getMonth()!==currentDate.getMonth()?"is-outside":"",sameDay(date,today)?"is-today":""].filter(Boolean).join(" ");
+      const dateRanges=backgroundRangesForDate(date);
+      const classes=["month-cell",date.getMonth()!==currentDate.getMonth()?"is-outside":"",sameDay(date,today)?"is-today":"",dateRanges.length?"has-background-range":""].filter(Boolean).join(" ");
       const defaultDate=new Date(date.getFullYear(),date.getMonth(),date.getDate(),9);
-      return `<div class="${classes}" role="gridcell" data-date="${formatDateTime(defaultDate)}"><span class="day-number">${date.getDate()}</span>
+      const rangeTitles=dateRanges.map(range=>range.title).join(", ");
+      return `<div class="${classes}" role="gridcell" data-date="${formatDateTime(defaultDate)}"${rangeTitles?` title="${escapeHtml(rangeTitles)}" aria-label="${escapeHtml(date.toLocaleDateString(LOCALE,{dateStyle:"full"}))} : ${escapeHtml(rangeTitles)}"`:""}><span class="day-number">${date.getDate()}</span>
         ${shown.map(event=>`<button class="event-chip" type="button" data-event-id="${escapeHtml(event.id)}" style="${eventStyle(event)}" title="${escapeHtml(event.title)}">${isAllDay(event)?"":`${formatTime(event.start)} `}${escapeHtml(event.title)}</button>`).join("")}
         ${more>0?`<div class="more-events">+ ${more} autre${more>1?"s":""}</div>`:""}</div>`;
-    }).join("")}</div>`;
+    }).join("")}</div><div class="calendar-legend"><span class="calendar-legend__swatch" aria-hidden="true"></span>Vacances scolaires</div>`;
   contentElement.querySelectorAll(".month-cell").forEach(cell=>listen(cell,"click",event=>{
     if(suppressMonthClick){suppressMonthClick=false;clearTimeout(suppressMonthClickTimer);return;}
     if(event.target.closest("[data-event-id]"))return;const start=fromDateTime(cell.dataset.date);openCreateDialog(start,new Date(start.getTime()+3600000));
@@ -402,6 +432,13 @@ if (demoRoot) {
       {id:"event-3",title:"Atelier de conception",start:new Date(2026,9,22,14),end:new Date(2026,9,22,16),color:"violet"},
       {id:"event-4",title:"Conférence produit",start:new Date(2026,9,24),end:new Date(2026,9,26),color:"green"},
       {id:"event-5",title:"Revue hebdomadaire",start:new Date(2026,9,26,10),end:new Date(2026,9,26,11),color:"rose"}
+    ],
+    backgroundRanges: [
+      {title:"Vacances de la Toussaint",start:"2026-10-17",end:"2026-11-01"},
+      {title:"Vacances de Noël",start:"2026-12-19",end:"2027-01-03"},
+      {title:"Vacances d’hiver",start:"2027-02-13",end:"2027-02-28"},
+      {title:"Vacances de printemps",start:"2027-04-10",end:"2027-04-25"},
+      {title:"Vacances d’été",start:"2027-07-03",end:"2027-08-31"}
     ]
   });
 }
