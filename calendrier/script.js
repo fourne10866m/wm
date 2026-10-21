@@ -24,6 +24,7 @@ const CALENDAR_MARKUP = `
       <button class="view-button is-active" data-view="month" type="button">Mois</button>
       <button class="view-button" data-view="week" type="button">Semaine</button>
       <button class="view-button" data-view="day" type="button">Jour</button>
+      <button class="view-button" data-view="year" type="button">Année</button>
     </div>
   </header>
   <section class="calendar-content" id="calendarContent" aria-label="Vue du calendrier"></section>
@@ -73,7 +74,7 @@ function create(root, options = {}) {
   let currentDate = startOfDay(initialDate);
   let currentView = options.view ?? "month", editingEventId = null;
   let events = (options.events ?? []).map(normalizeEvent);
-  if (!["month", "week", "day"].includes(currentView)) throw new RangeError("La vue doit être month, week ou day.");
+  if (!["month", "week", "day", "year"].includes(currentView)) throw new RangeError("La vue doit être month, week, day ou year.");
   const titleElement = element("title"), contentElement = element("content"), dialog = element("dialog"), form = element("form");
   const titleInput = element("eventTitle"), startInput = element("eventStart"), endInput = element("eventEnd");
   const colorInput = element("eventColor"), errorElement = element("error"), deleteButton = element("deleteButton");
@@ -89,6 +90,20 @@ function create(root, options = {}) {
   listen(element("next"), "click", () => movePeriod(1));
   listen(element("today"), "click", () => { currentDate = new Date(today); render(); });
   viewButtons.forEach(button => listen(button, "click", () => setView(button.dataset.view)));
+  listen(contentElement, "click", event => {
+    if (currentView !== "year") return;
+    const monthButton = event.target.closest("[data-year-month]");
+    if (monthButton) {
+      currentDate = new Date(currentDate.getFullYear(), Number(monthButton.dataset.yearMonth), 1);
+      setView("month");
+      return;
+    }
+    const dateButton = event.target.closest("[data-year-date]");
+    if (dateButton) {
+      currentDate = startOfDay(fromDateTime(dateButton.dataset.yearDate));
+      setView("month");
+    }
+  });
   listen(element("close"), "click", closeDialog);
   listen(element("cancel"), "click", closeDialog);
   listen(deleteButton, "click", deleteCurrentEvent);
@@ -114,7 +129,7 @@ function create(root, options = {}) {
   };
 
   function setView(view) {
-    if (!["month", "week", "day"].includes(view)) throw new RangeError("La vue doit être month, week ou day.");
+    if (!["month", "week", "day", "year"].includes(view)) throw new RangeError("La vue doit être month, week, day ou year.");
     currentView = view;
     viewButtons.forEach(button => button.classList.toggle("is-active", button.dataset.view === view));
     render();
@@ -203,9 +218,43 @@ function eventStyle(event){const color=COLORS[event.color]||COLORS.blue;return `
 /** Renvoie les événements qui chevauchent l'intervalle [start, end). */
 function visibleEvents(start,end){return events.filter(event=>event.start<end&&event.end>start);}
 /** Déplace la période affichée selon la vue active, puis actualise le calendrier. */
-function movePeriod(direction){if(currentView==="month")currentDate=addMonths(currentDate,direction);else currentDate=addDays(currentDate,direction*(currentView==="week"?7:1));render();}
+function movePeriod(direction){
+  if(currentView==="year"){
+    const year=currentDate.getFullYear()+direction, month=currentDate.getMonth();
+    currentDate=new Date(year,month,Math.min(currentDate.getDate(),new Date(year,month+1,0).getDate()));
+  }
+  else if(currentView==="month")currentDate=addMonths(currentDate,direction);
+  else currentDate=addDays(currentDate,direction*(currentView==="week"?7:1));
+  render();
+}
 /** Choisit et affiche le rendu adapté à la vue calendrier sélectionnée. */
-function render(){if(currentView==="month")renderMonth();else renderTimeView(currentView==="week"?7:1);}
+function render(){if(currentView==="year")renderYear();else if(currentView==="month")renderMonth();else renderTimeView(currentView==="week"?7:1);}
+
+/** Construit une vue annuelle compacte avec navigation vers chacun des mois et jours. */
+function renderYear(){
+  const year=currentDate.getFullYear();
+  titleElement.textContent=String(year);
+  contentElement.innerHTML=`<div class="year-grid" aria-label="Calendrier de l’année ${year}">
+    ${Array.from({length:12},(_,month)=>{
+      const firstOfMonth=new Date(year,month,1), daysInMonth=new Date(year,month+1,0).getDate();
+      const mondayOffset=(firstOfMonth.getDay()+6)%7;
+      const monthName=firstOfMonth.toLocaleDateString(LOCALE,{month:"long"});
+      return `<section class="year-month" aria-label="${escapeHtml(monthName)} ${year}">
+        <button class="year-month-title" type="button" data-year-month="${month}">${escapeHtml(monthName)}</button>
+        <div class="year-month-grid" role="grid" aria-label="${escapeHtml(monthName)} ${year}">
+          ${WEEKDAYS.map(day=>`<span class="year-weekday" aria-hidden="true">${escapeHtml(day.slice(0,2))}</span>`).join("")}
+          ${Array.from({length:mondayOffset},()=>`<span class="year-day year-day--empty" aria-hidden="true"></span>`).join("")}
+          ${Array.from({length:daysInMonth},(_,index)=>{
+            const date=new Date(year,month,index+1), nextDate=addDays(date,1);
+            const hasEvents=visibleEvents(date,nextDate).length>0;
+            const classes=["year-day",sameDay(date,today)?"is-today":"",hasEvents?"has-events":""].filter(Boolean).join(" ");
+            return `<button class="${classes}" type="button" data-year-date="${formatDateTime(date)}" aria-label="${escapeHtml(date.toLocaleDateString(LOCALE,{day:"numeric",month:"long",year:"numeric"}))}${hasEvents?", événements prévus":""}">${index+1}</button>`;
+          }).join("")}
+        </div>
+      </section>`;
+    }).join("")}
+  </div>`;
+}
 
 /** Construit la grille mensuelle et relie ses cases et événements aux actions. */
 function renderMonth(){

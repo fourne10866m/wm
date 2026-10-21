@@ -24,7 +24,7 @@ window.addEventListener("DOMContentLoaded", () => {
 </script>
 ```
 
-La racine passée à `create(root, options)` est un élément DOM ou un sélecteur CSS. Les identifiants par défaut sont générés par le script; `options.selectors` permet de les remplacer si un balisage personnalisé est fourni. Les options de présentation sont `locale`, `view` (`month`, `week` ou `day`), `initialDate`, `today`, `firstHour`, `lastHour`, `hourHeight`, `weekdays`, `longWeekdays` et `colors`. `options.events` initialise les événements; `options.onChange` est appelée après chaque ajout, modification ou suppression.
+La racine passée à `create(root, options)` est un élément DOM ou un sélecteur CSS. Les identifiants par défaut sont générés par le script; `options.selectors` permet de les remplacer si un balisage personnalisé est fourni. Les options de présentation sont `locale`, `view` (`year`, `month`, `week` ou `day`), `initialDate`, `today`, `firstHour`, `lastHour`, `hourHeight`, `weekdays`, `longWeekdays` et `colors`. `options.events` initialise les événements; `options.onChange` est appelée après chaque ajout, modification ou suppression.
 
 ### Ajouter un événement
 
@@ -52,6 +52,8 @@ L'objet événement accepte les propriétés suivantes :
 
 Les dates sont manipulées en heure locale par l'interface. Pour éviter les ambiguïtés de fuseau lors du passage de chaînes, privilégier un objet `Date` construit explicitement (comme dans l'exemple). `addEvent` lève une `TypeError` si le titre est vide et une `RangeError` si les dates sont invalides, si la fin n'est pas après le début ou si l'identifiant existe déjà.
 
+La vue `"year"` affiche les douze mini-calendriers de l'année. Les flèches changent d'année; cliquer sur un nom de mois ouvre sa vue mensuelle et cliquer sur un jour ouvre le mois correspondant. Un point signale les jours qui contiennent un événement.
+
 ### Autres méthodes
 
 Chaque instance possède son propre état et expose :
@@ -59,7 +61,7 @@ Chaque instance possède son propre état et expose :
 | Méthode | Comportement |
 | --- | --- |
 | `render()` | Redessine la vue courante. |
-| `setView(view)` | Affiche `"month"`, `"week"` ou `"day"`; lève une `RangeError` pour une autre valeur. |
+| `setView(view)` | Affiche `"year"`, `"month"`, `"week"` ou `"day"`; lève une `RangeError` pour une autre valeur. |
 | `setDate(date)` | Affiche la période contenant la date fournie. |
 | `previous()` / `next()` | Navigue vers la période précédente ou suivante selon la vue. |
 | `today()` | Revient à la date du jour enregistrée à la création de l'instance. |
